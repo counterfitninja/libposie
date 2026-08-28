@@ -21,7 +21,7 @@
         "Node.js 24": "ghcr.io/parkervcp/yolks:nodejs_24"
     },
     "file_denylist": [],
-    "startup": "if [[ \"${AUTO_UPDATE}\" == \"1\" ]] && [[ -d .git ]]; then git config --global --add safe.directory /home/container; git fetch --depth 1 origin \"${GIT_BRANCH}\" && git reset --hard \"origin/${GIT_BRANCH}\" && npm install --omit=dev --no-audit --no-fund; fi; node server/index.js",
+    "startup": "APP_DIR=.; if [[ ! -f ./package.json ]] && [[ -f /mnt/server/package.json ]]; then APP_DIR=/mnt/server; elif [[ ! -f ./package.json ]] && [[ -f /home/container/package.json ]]; then APP_DIR=/home/container; fi; if [[ -d \"${APP_DIR}\" ]]; then cd \"${APP_DIR}\"; fi; if [[ \"${AUTO_UPDATE}\" == \"1\" ]] && [[ -d .git ]]; then git config --global --add safe.directory \"${APP_DIR}\"; git fetch --depth 1 origin \"${GIT_BRANCH}\" && git reset --hard \"origin/${GIT_BRANCH}\" && npm install --omit=dev --no-audit --no-fund; fi; node server/index.js",
     "config": {
         "files": "{}",
         "startup": "{\r\n    \"done\": \"Libposie listening on\"\r\n}",
