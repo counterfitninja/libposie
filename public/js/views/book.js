@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { state, refreshCategories, navigate } from '../app.js';
 import {
-  coverMarkup, esc, formatDate, relativeDays, openModal, confirmDialog, toast, statusLabel
+  coverMarkup, esc, formatDate, relativeDays, openModal, confirmDialog, toast, statusLabel, spinner
 } from '../ui.js';
 
 export async function renderBook({ param, mount }) {
@@ -183,6 +183,11 @@ export async function renderBook({ param, mount }) {
     openModal({
       title: 'Edit book details',
       body: `
+        <div class="field">
+          <button type="button" class="btn ghost" id="lookupMeta">Look up metadata…</button>
+          <p class="hint">Re-query Google Books, Open Library and ISBNdb and pick a source's record — useful if the cover or details are wrong or missing.</p>
+        </div>
+        <div id="lookupResults"></div>
         ${field('f_title', 'Title', book.title)}
         ${field('f_subtitle', 'Subtitle', book.subtitle)}
         ${field('f_authors', 'Authors', book.authors)}
@@ -224,6 +229,7 @@ export async function renderBook({ param, mount }) {
           close();
           await remove();
         });
+        modal.querySelector('#lookupMeta').addEventListener('click', () => runLookup(modal));
         modal.querySelector('[data-save]').addEventListener('click', async () => {
           const val = (id) => modal.querySelector(`#${id}`).value.trim();
           const payload = {
@@ -256,6 +262,61 @@ export async function renderBook({ param, mount }) {
         });
       }
     });
+  }
+
+  async function runLookup(modal) {
+    const box = modal.querySelector('#lookupResults');
+    const query = modal.querySelector('#f_isbn13').value.trim()
+      || modal.querySelector('#f_isbn10').value.trim()
+      || `${modal.querySelector('#f_title').value.trim()} ${modal.querySelector('#f_authors').value.trim()}`.trim();
+    if (!query) return toast('Enter a title or ISBN first', 'error');
+
+    box.innerHTML = spinner();
+    try {
+      const { results } = await api.lookup(query);
+      if (!results.length) {
+        box.innerHTML = '<p class="small muted">No matches found from any source.</p>';
+        return;
+      }
+      box.innerHTML = `
+        <p class="small muted">Pick a source to fill the fields below with its record:</p>
+        <div class="stack" style="margin:.5rem 0 1rem">
+          ${results.map((r, i) => `
+            <div class="result-item">
+              ${coverMarkup(r, 'thumb')}
+              <div>
+                <strong>${esc(r.title)}</strong>
+                <div class="small">${esc(r.authors || 'Unknown author')}</div>
+                <div class="small muted">${[r.publisher, r.publishedDate, r.isbn13 || r.isbn10, `via ${r.source}`]
+                  .filter(Boolean).map(esc).join(' · ')}</div>
+              </div>
+              <button type="button" class="btn primary sm" data-pick="${i}">Use this</button>
+            </div>`).join('')}
+        </div>`;
+      box.querySelectorAll('[data-pick]').forEach((btn) => {
+        btn.addEventListener('click', () => applyCandidate(modal, results[Number(btn.dataset.pick)]));
+      });
+    } catch (err) {
+      box.innerHTML = '';
+      toast(err.message, 'error');
+    }
+  }
+
+  function applyCandidate(modal, candidate) {
+    const set = (id, value) => { modal.querySelector(`#${id}`).value = value ?? ''; };
+    set('f_title', candidate.title);
+    set('f_subtitle', candidate.subtitle);
+    set('f_authors', candidate.authors);
+    set('f_publisher', candidate.publisher);
+    set('f_publishedDate', candidate.publishedDate);
+    set('f_isbn13', candidate.isbn13);
+    set('f_isbn10', candidate.isbn10);
+    set('f_pageCount', candidate.pageCount);
+    set('f_language', candidate.language);
+    set('f_coverUrl', candidate.coverUrl);
+    modal.querySelector('#f_description').value = candidate.description || '';
+    modal.querySelector('#lookupResults').innerHTML = '';
+    toast(`Filled from ${candidate.source}`, 'success');
   }
 }
 

@@ -112,7 +112,8 @@ async function openLibraryByIsbn(isbn) {
       language: '',
       description:
         typeof entry.notes === 'string' ? entry.notes : entry.notes?.value || entry.excerpts?.[0]?.text || '',
-      coverUrl: entry.cover?.large || entry.cover?.medium || `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+      // Only trust a cover Open Library actually indexed — guessed ISBN cover URLs 404 into a blank placeholder image.
+      coverUrl: entry.cover?.large || entry.cover?.medium || '',
       source: 'Open Library'
     }
   ];
