@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b1a17" />
+    <meta name="description" content="Libposie — your self-hosted personal book library." />
+    <title>Libposie</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell" hidden>
+      <header class="topbar">
+        <button class="icon-btn nav-toggle" id="navToggle" aria-label="Menu">&#9776;</button>
+        <a class="brand" href="#/library">
+          <span class="brand-mark">&#128218;</span>
+          <span class="brand-name">Libposie</span>
+        </a>
+        <div class="topbar-actions">
+          <a class="icon-btn" href="#/scan" aria-label="Scan a book">&#9906;</a>
+          <button class="icon-btn bell" id="bellBtn" aria-label="Notifications">
+            &#128276;<span class="badge" id="notifBadge" hidden>0</span>
+          </button>
+        </div>
+      </header>
+
+      <nav class="sidenav" id="sidenav">
+        <a href="#/library" data-route="library"><span>&#128218;</span> My library</a>
+        <a href="#/scan" data-route="scan"><span>&#9906;</span> Add a book</a>
+        <a href="#/discover" data-route="discover"><span>&#128270;</span> Discover</a>
+        <a href="#/borrowing" data-route="borrowing"><span>&#128230;</span> Borrowing</a>
+        <a href="#/lending" data-route="lending"><span>&#128260;</span> Lending desk</a>
+        <a href="#/categories" data-route="categories"><span>&#127991;</span> Categories</a>
+        <a href="#/notifications" data-route="notifications"><span>&#128276;</span> Notifications</a>
+        <a href="#/settings" data-route="settings"><span>&#9881;</span> Settings</a>
+        <a href="#/admin" data-route="admin" id="adminLink" hidden><span>&#128737;</span> Server admin</a>
+        <button class="linkish logout" id="logoutBtn">Sign out</button>
+      </nav>
+
+      <main id="view" class="view" tabindex="-1"></main>
+
+      <nav class="tabbar">
+        <a href="#/library" data-route="library"><span>&#128218;</span>Library</a>
+        <a href="#/discover" data-route="discover"><span>&#128270;</span>Discover</a>
+        <a href="#/scan" data-route="scan" class="tab-primary"><span>&#9906;</span>Scan</a>
+        <a href="#/borrowing" data-route="borrowing"><span>&#128230;</span>Borrowed</a>
+        <a href="#/lending" data-route="lending"><span>&#128260;</span>Lending</a>
+      </nav>
+    </div>
+
+    <div id="authScreen" class="auth-screen" hidden></div>
+    <div id="modalRoot"></div>
+    <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

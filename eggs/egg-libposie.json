@@ -1,0 +1,263 @@
+{
+    "_comment": "Libposie egg for Pelican Panel — https://github.com/counterfitninja/libposie",
+    "meta": {
+        "version": "PLCN_v1",
+        "update_url": null
+    },
+    "exported_at": "2026-08-28T00:00:00+00:00",
+    "name": "Libposie",
+    "author": "admin@libposie.local",
+    "uuid": "9f2a5c4e-1d3b-4f77-9c21-8b5a6d0e4f13",
+    "description": "Libposie — a self-hosted, multi-user personal book library PWA. Scan ISBNs, catalogue your shelves, share books publicly and manage lending with due-date reminders. Node.js + SQLite, no database server required.",
+    "tags": [
+        "books",
+        "library",
+        "nodejs",
+        "pwa"
+    ],
+    "features": null,
+    "docker_images": {
+        "Node.js 22": "ghcr.io/parkervcp/yolks:nodejs_22",
+        "Node.js 24": "ghcr.io/parkervcp/yolks:nodejs_24"
+    },
+    "file_denylist": [],
+    "startup": "if [[ \"${AUTO_UPDATE}\" == \"1\" ]] && [[ -d .git ]]; then git config --global --add safe.directory /home/container; git fetch --depth 1 origin \"${GIT_BRANCH}\" && git reset --hard \"origin/${GIT_BRANCH}\" && npm install --omit=dev --no-audit --no-fund; fi; node server/index.js",
+    "config": {
+        "files": "{}",
+        "startup": "{\r\n    \"done\": \"Libposie listening on\"\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# Libposie installation script\n# Runs in a temporary container; the server files live in /mnt/server\n\nset -e\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nif [ -z \"${GIT_ADDRESS}\" ]; then\n    echo \"ERROR: No repository address was provided.\"\n    exit 1\nfi\n\nBRANCH=\"${GIT_BRANCH:-main}\"\nREPO=\"${GIT_ADDRESS}\"\ncase \"${REPO}\" in\n    *.git) ;;\n    *) REPO=\"${REPO}.git\" ;;\nesac\n\nAUTH_REPO=\"${REPO}\"\nif [ -n \"${GIT_USERNAME}\" ] && [ -n \"${GIT_TOKEN}\" ]; then\n    AUTH_REPO=\"https://${GIT_USERNAME}:${GIT_TOKEN}@${REPO#https://}\"\nfi\n\nif command -v git >/dev/null 2>&1; then\n    git config --global --add safe.directory /mnt/server\n\n    if [ -d /mnt/server/.git ]; then\n        echo \"Existing checkout found — updating to ${BRANCH}\"\n        git remote set-url origin \"${AUTH_REPO}\"\n        git fetch --depth 1 origin \"${BRANCH}\"\n        git reset --hard \"origin/${BRANCH}\"\n        git clean -fd -e data -e .env -e node_modules\n    else\n        echo \"Cloning ${REPO} (${BRANCH})\"\n        rm -rf /tmp/libposie\n        git clone --depth 1 --branch \"${BRANCH}\" \"${AUTH_REPO}\" /tmp/libposie\n        cp -a /tmp/libposie/. /mnt/server/\n        rm -rf /tmp/libposie\n    fi\nelse\n    echo \"git is unavailable — downloading a source tarball instead\"\n    curl -sSL \"${REPO%.git}/archive/refs/heads/${BRANCH}.tar.gz\" | tar -xz --strip-components=1 -C /mnt/server\nfi\n\nif [ ! -f /mnt/server/package.json ]; then\n    echo \"ERROR: package.json was not found — check the repository address and branch.\"\n    exit 1\nfi\n\necho \"Installing production dependencies\"\ncd /mnt/server\nnpm install --omit=dev --no-audit --no-fund\n\n# SQLite database, WAL files and the auto-generated session secret live here.\nmkdir -p /mnt/server/data\n\necho \"----------------------------------------\"\necho \"Libposie installation complete.\"\necho \"Start the server, then open it in a browser.\"\necho \"The FIRST account you register becomes the administrator.\"\necho \"----------------------------------------\"",
+            "container": "ghcr.io/parkervcp/yolks:nodejs_22",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "sort": 1,
+            "name": "Repository address",
+            "description": "The Git repository Libposie is installed from. Change this if you run your own fork.",
+            "env_variable": "GIT_ADDRESS",
+            "default_value": "https://github.com/counterfitninja/libposie.git",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 2,
+            "name": "Branch",
+            "description": "Branch or tag to install.",
+            "env_variable": "GIT_BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string",
+                "max:64"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 3,
+            "name": "Git username",
+            "description": "Only needed for a private repository. Leave blank otherwise.",
+            "env_variable": "GIT_USERNAME",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "max:64"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 4,
+            "name": "Git access token",
+            "description": "Personal access token for a private repository. Leave blank otherwise.",
+            "env_variable": "GIT_TOKEN",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 5,
+            "name": "Auto update on boot",
+            "description": "Set to 1 to pull the latest code and reinstall dependencies every time the server starts.",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "in:0,1"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 6,
+            "name": "Session secret",
+            "description": "Signs login cookies. Leave blank and one is generated automatically and stored in data/.jwt-secret. Changing it signs everybody out.",
+            "env_variable": "JWT_SECRET",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "min:24",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 7,
+            "name": "Secure cookies (HTTPS)",
+            "description": "Set to 1 when Libposie is served over HTTPS through a reverse proxy. Required for camera scanning and push notifications on remote devices.",
+            "env_variable": "SECURE_COOKIES",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "in:0,1"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 8,
+            "name": "Allow registration",
+            "description": "Set to 0 to close sign-ups once your members have accounts. The very first account is always allowed and becomes the administrator.",
+            "env_variable": "ALLOW_REGISTRATION",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "in:0,1"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 9,
+            "name": "VAPID public key",
+            "description": "Web push public key. Leave blank to generate a pair automatically on first boot. Set both keys explicitly to keep push subscriptions working across reinstalls.",
+            "env_variable": "VAPID_PUBLIC_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 10,
+            "name": "VAPID private key",
+            "description": "Web push private key that pairs with the public key above.",
+            "env_variable": "VAPID_PRIVATE_KEY",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 11,
+            "name": "VAPID contact address",
+            "description": "Contact address sent to push services, e.g. mailto:you@example.com",
+            "env_variable": "VAPID_SUBJECT",
+            "default_value": "mailto:admin@example.com",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "required",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 12,
+            "name": "Google Books API key",
+            "description": "Optional. The anonymous Google Books quota is shared and often exhausted; a free API key makes that metadata source reliable.",
+            "env_variable": "GOOGLE_BOOKS_API_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 13,
+            "name": "ISBNdb API key",
+            "description": "Optional third metadata source from https://isbndb.com",
+            "env_variable": "ISBNDB_API_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "nullable",
+                "string",
+                "max:255"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 14,
+            "name": "Data directory",
+            "description": "Where the SQLite database is written, relative to the server root. Back this folder up.",
+            "env_variable": "DATA_DIR",
+            "default_value": "./data",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "string",
+                "max:128"
+            ],
+            "field_type": "text"
+        },
+        {
+            "sort": 15,
+            "name": "Node environment",
+            "description": "Leave as production.",
+            "env_variable": "NODE_ENV",
+            "default_value": "production",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "string",
+                "in:production,development"
+            ],
+            "field_type": "text"
+        }
+    ]
+}

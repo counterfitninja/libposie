@@ -1,0 +1,20 @@
+{
+  "name": "Libposie — Personal Book Library",
+  "short_name": "Libposie",
+  "description": "Catalogue, share and lend the books on your shelves.",
+  "start_url": "/#/library",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#1b1a17",
+  "theme_color": "#1b1a17",
+  "categories": ["books", "productivity"],
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Scan a book", "url": "/#/scan" },
+    { "name": "Lending desk", "url": "/#/lending" }
+  ]
+}
