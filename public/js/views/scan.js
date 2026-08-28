@@ -17,7 +17,7 @@ export async function renderScan({ mount }) {
     <div class="card stack" style="margin-bottom:1rem">
       <div class="row">
         <button class="btn primary" id="startCam">Scan a barcode</button>
-        <button class="btn ghost hidden" id="stopCam">Stop camera</button>
+        <button class="btn ghost hidden" id="stopCam">Done scanning</button>
       </div>
       <div id="camWrap" class="hidden">
         <div class="scanner-frame">
@@ -25,7 +25,7 @@ export async function renderScan({ mount }) {
           <div class="reticle"></div>
           <div class="laser"></div>
         </div>
-        <p class="small muted center" style="margin-top:.5rem">Hold the barcode inside the frame.</p>
+        <p class="small muted center" style="margin-top:.5rem">Hold the barcode inside the frame. Add a match to keep scanning, or tap "Done scanning" when you're finished.</p>
       </div>
       <p class="small muted" id="camNote"></p>
     </div>
@@ -47,9 +47,11 @@ export async function renderScan({ mount }) {
     mount.querySelector('#camNote').textContent =
       'Camera scanning needs a browser with camera access over HTTPS (or localhost). You can still search by ISBN below.';
     startBtn.disabled = true;
+  } else {
+    startCamera();
   }
 
-  startBtn.addEventListener('click', async () => {
+  async function startCamera() {
     camWrap.classList.remove('hidden');
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
@@ -67,7 +69,8 @@ export async function renderScan({ mount }) {
         stopCamera();
       }
     );
-  });
+  }
+  startBtn.addEventListener('click', startCamera);
 
   function stopCamera() {
     stopScanner?.();
@@ -215,9 +218,11 @@ export async function renderScan({ mount }) {
               });
             }
             close();
-            stopCamera();
             toast(`"${book.title}" added to your library`, 'success');
-            location.hash = `#/book/${book.id}`;
+            lastCode = '';
+            results.innerHTML = '';
+            mount.querySelector('#q').value = '';
+            if (!stopScanner) mount.querySelector('#q').focus();
           } catch (err) {
             toast(err.message, 'error');
           }
