@@ -22,6 +22,16 @@ router.get('/', (req, res) => {
   });
 });
 
+/** Full member directory (regardless of public books), used to pick an existing account as a loan's borrower. */
+router.get('/directory', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT id, username, display_name FROM users WHERE is_active = 1 AND id != ? ORDER BY display_name COLLATE NOCASE`
+    )
+    .all(req.user.id);
+  res.json({ users: rows.map((u) => ({ id: u.id, username: u.username, name: u.display_name })) });
+});
+
 /* ----------------------------------------------------------- site admin */
 
 router.get('/admin/overview', requireAdmin, (_req, res) => {

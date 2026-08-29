@@ -81,7 +81,9 @@ CREATE TABLE IF NOT EXISTS loans (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id            INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
   owner_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  borrower_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  borrower_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  manual_borrower_name  TEXT,
+  manual_borrower_notes TEXT,
   status             TEXT NOT NULL DEFAULT 'requested',
   message            TEXT,
   requested_at       TEXT NOT NULL DEFAULT (datetime('now')),
@@ -128,6 +130,45 @@ CREATE TABLE IF NOT EXISTS settings (
 if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migrated_books_public_default'").get()) {
   db.exec("UPDATE books SET is_public = 1 WHERE is_public = 0");
   db.prepare("INSERT INTO settings (key, value) VALUES ('migrated_books_public_default', '1')").run();
+}
+
+// One-time migration: allow manual loans (borrower_id NULL + manual_borrower_name/notes) on
+// databases created before this feature existed, where borrower_id was NOT NULL.
+const loanCols = db.prepare('PRAGMA table_info(loans)').all().map((c) => c.name);
+if (!loanCols.includes('manual_borrower_name')) {
+  db.exec(`
+    ALTER TABLE loans RENAME TO loans_old;
+
+    CREATE TABLE loans (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      book_id            INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      owner_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      borrower_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      manual_borrower_name  TEXT,
+      manual_borrower_notes TEXT,
+      status             TEXT NOT NULL DEFAULT 'requested',
+      message            TEXT,
+      requested_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      decided_at         TEXT,
+      lent_at            TEXT,
+      due_at             TEXT,
+      return_requested_at TEXT,
+      returned_at        TEXT,
+      last_reminder_at   TEXT
+    );
+
+    INSERT INTO loans (id, book_id, owner_id, borrower_id, status, message, requested_at,
+                        decided_at, lent_at, due_at, return_requested_at, returned_at, last_reminder_at)
+    SELECT id, book_id, owner_id, borrower_id, status, message, requested_at,
+           decided_at, lent_at, due_at, return_requested_at, returned_at, last_reminder_at
+    FROM loans_old;
+
+    DROP TABLE loans_old;
+
+    CREATE INDEX IF NOT EXISTS idx_loans_book ON loans(book_id);
+    CREATE INDEX IF NOT EXISTS idx_loans_owner ON loans(owner_id, status);
+    CREATE INDEX IF NOT EXISTS idx_loans_borrower ON loans(borrower_id, status);
+  `);
 }
 
 /** Active loan statuses: the book is not on the owner's shelf. */

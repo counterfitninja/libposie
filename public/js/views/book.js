@@ -68,7 +68,9 @@ export async function renderBook({ param, mount }) {
     mount.querySelector('#addNote').addEventListener('click', () => noteModal());
     mount.querySelector('#editBook')?.addEventListener('click', editModal);
     mount.querySelector('#deleteBook')?.addEventListener('click', remove);
+    mount.querySelector('#requestViaWhatsApp')?.addEventListener('click', requestViaWhatsApp);
     mount.querySelector('#requestLoan')?.addEventListener('click', requestLoan);
+    mount.querySelector('#manualLoan')?.addEventListener('click', manualLoanModal);
     mount.querySelector('#cancelRequest')?.addEventListener('click', () => loanAction(book.myLoan.id, 'cancel'));
     mount.querySelector('#returnedNotice')?.addEventListener('click', () => loanAction(book.myLoan.id, 'returned-notice'));
 
@@ -133,11 +135,70 @@ export async function renderBook({ param, mount }) {
     });
   }
 
+  async function manualLoanModal() {
+    let members = [];
+    try {
+      members = (await api.userDirectory()).users;
+    } catch {
+      /* directory is a nice-to-have; fall back to free text only */
+    }
+
+    openModal({
+      title: `Loan "${book.title}" without a request`,
+      body: `<div class="field">
+          <label for="mlName">Borrower's name</label>
+          <input id="mlName" list="mlMembers" placeholder="Type a name, or pick a member" autocomplete="off" />
+          <datalist id="mlMembers">
+            ${members.map((m) => `<option value="${esc(m.name)}"></option>`).join('')}
+          </datalist>
+          <p class="hint">${members.length ? "Pick an existing member to notify them, or type any other name." : 'Type the name of who is borrowing it.'}</p>
+        </div>
+        <div class="field">
+          <label for="mlDays">Loan length (days)</label>
+          <input id="mlDays" type="number" min="1" max="365" value="${state.user?.loanDays || 28}" />
+        </div>
+        <div class="field">
+          <label for="mlNotes">Notes (optional)</label>
+          <textarea id="mlNotes" placeholder="Contact details, where they live, why they borrowed it…"></textarea>
+        </div>
+        <p class="hint">Use this to skip the request flow — members you pick get notified as usual, but names you type won't be.</p>`,
+      footer: `<button class="btn ghost" data-close>Cancel</button>
+               <button class="btn primary" data-lend>Lend it out</button>`,
+      onMount(modal, close) {
+        modal.querySelector('[data-lend]').addEventListener('click', async () => {
+          const typed = modal.querySelector('#mlName').value.trim();
+          if (!typed) return toast('Enter a name for the borrower', 'error');
+          const match = members.find((m) => m.name.toLowerCase() === typed.toLowerCase());
+          try {
+            await api.manualLoan({
+              bookId: book.id,
+              borrowerId: match?.id,
+              borrowerName: match ? undefined : typed,
+              days: Number(modal.querySelector('#mlDays').value) || undefined,
+              notes: modal.querySelector('#mlNotes').value
+            });
+            close();
+            toast('Book marked as on loan', 'success');
+            await reload();
+          } catch (err) {
+            toast(err.message, 'error');
+          }
+        });
+      }
+    });
+  }
+
   async function remove() {
     if (!(await confirmDialog(`Remove "${book.title}" from your library? This also deletes its notes and loan history.`, { confirmLabel: 'Delete book' }))) return;
     await api.deleteBook(book.id);
     toast('Book removed', 'success');
     navigate('#/library');
+  }
+
+  function requestViaWhatsApp() {
+    const bookUrl = new URL(`#/book/${book.id}`, window.location.href).href;
+    const message = `Hi ${book.owner?.name || ''}, could I borrow "${book.title}"? ${bookUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
 
   function noteModal(existing) {
@@ -344,7 +405,8 @@ function actionButtons(book) {
   const loan = book.myLoan;
   if (!loan) {
     return book.availability === 'available'
-      ? '<button class="btn primary" id="requestLoan">Ask to borrow</button>'
+      ? `<button class="btn primary" id="requestLoan">Ask to borrow</button>
+         <button class="btn" id="requestViaWhatsApp">Share to WhatsApp</button>`
       : '<span class="small muted">Not available to borrow right now.</span>';
   }
   if (loan.status === 'requested' || loan.status === 'approved') {
@@ -371,7 +433,9 @@ function lendingPanel(book) {
           <div class="spread">
             <div>
               <strong>${esc(loan.borrower?.name || '')}</strong>
+              ${loan.borrower?.manual ? '<span class="pill">No account</span>' : ''}
               <div class="small muted">Lent ${formatDate(loan.lentAt)} · ${esc(relativeDays(loan.dueAt))}</div>
+              ${loan.manualNotes ? `<div class="small muted">${esc(loan.manualNotes)}</div>` : ''}
             </div>
             <span class="pill ${loan.overdue ? 'overdue' : 'on_loan'}">${esc(statusLabel(loan.status))}</span>
           </div>
@@ -382,7 +446,8 @@ function lendingPanel(book) {
             <button class="btn primary" data-loan-action="return" data-loan-id="${loan.id}">Mark returned</button>
           </div>
         </div>`
-      : '<p class="small muted">This book is on your shelf.</p>'}
+      : `<p class="small muted">This book is on your shelf.</p>
+         <button class="btn" id="manualLoan">Loan without a request</button>`}
 
     ${pending.length
       ? `<h3 style="margin-top:1rem">Pending requests</h3>
@@ -401,7 +466,7 @@ function lendingPanel(book) {
       ? `<h3 style="margin-top:1rem">History</h3>
          <div class="stack">${history.slice(0, 10).map((l) => `
            <div class="card spread">
-             <div><strong>${esc(l.borrower.name)}</strong>
+             <div><strong>${esc(l.borrower?.name || '')}</strong>${l.borrower?.manual ? ' <span class="pill">No account</span>' : ''}
                <div class="small muted">${esc(statusLabel(l.status))} · ${formatDate(l.returnedAt || l.lentAt || l.requestedAt)}</div></div>
            </div>`).join('')}</div>`
       : ''}

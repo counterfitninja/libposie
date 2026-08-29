@@ -98,14 +98,19 @@ router.get('/:id', (req, res) => {
     book.loanHistory = db
       .prepare(
         `SELECT l.*, u.display_name AS borrower_name, u.username AS borrower_username
-         FROM loans l JOIN users u ON u.id = l.borrower_id
+         FROM loans l LEFT JOIN users u ON u.id = l.borrower_id
          WHERE l.book_id = ? ORDER BY l.id DESC LIMIT 50`
       )
       .all(row.id)
       .map((l) => ({
         id: l.id,
         status: l.status,
-        borrower: { id: l.borrower_id, name: l.borrower_name, username: l.borrower_username },
+        borrower: l.borrower_id
+          ? { id: l.borrower_id, name: l.borrower_name, username: l.borrower_username }
+          : l.manual_borrower_name
+            ? { name: l.manual_borrower_name, manual: true }
+            : null,
+        manualNotes: l.manual_borrower_notes || null,
         requestedAt: l.requested_at,
         lentAt: l.lent_at,
         dueAt: l.due_at,

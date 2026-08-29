@@ -14,7 +14,7 @@ const LOAN_SELECT = `
   FROM loans l
   JOIN books b ON b.id = l.book_id
   JOIN users ob ON ob.id = l.owner_id
-  JOIN users br ON br.id = l.borrower_id`;
+  LEFT JOIN users br ON br.id = l.borrower_id`;
 
 function loadLoan(id) {
   return db.prepare(`${LOAN_SELECT} WHERE l.id = ?`).get(Number(id));
@@ -72,6 +72,53 @@ router.post('/', (req, res) => {
     body: `${req.user.display_name} would like to borrow "${book.title}".`,
     link: '#/lending'
   });
+
+  res.status(201).json({ loan: shapeLoan(loadLoan(info.lastInsertRowid)) });
+});
+
+/** Owner lends a book directly, either to an existing member or someone who does not use the app. */
+router.post('/manual', (req, res) => {
+  const bookId = Number(req.body?.bookId);
+  const book = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
+  if (!book) return res.status(404).json({ error: 'Book not found.' });
+  if (book.owner_id !== req.user.id) return res.status(403).json({ error: 'You do not own this book.' });
+
+  const active = getActiveLoan(bookId);
+  if (active) return res.status(409).json({ error: 'That book is already out on loan.' });
+
+  const notes = String(req.body?.notes || '').slice(0, 500);
+  const borrowerId = Number(req.body?.borrowerId) || null;
+  let borrowerName = null;
+  let member = null;
+
+  if (borrowerId) {
+    member = db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(borrowerId);
+    if (!member) return res.status(404).json({ error: 'That member could not be found.' });
+    if (member.id === req.user.id) return res.status(400).json({ error: 'You already own this book.' });
+  } else {
+    borrowerName = String(req.body?.borrowerName || '').trim().slice(0, 200);
+    if (!borrowerName) return res.status(400).json({ error: 'A borrower name is required.' });
+  }
+
+  const days = Math.min(365, Math.max(1, Number(req.body?.days) || req.user.loan_days));
+  const dueAt = req.body?.dueAt && /^\d{4}-\d{2}-\d{2}$/.test(req.body.dueAt) ? req.body.dueAt : addDays(days);
+
+  const info = db
+    .prepare(
+      `INSERT INTO loans (book_id, owner_id, borrower_id, manual_borrower_name, manual_borrower_notes,
+                          status, requested_at, decided_at, lent_at, due_at)
+       VALUES (?, ?, ?, ?, ?, 'lent', datetime('now'), datetime('now'), datetime('now'), ?)`
+    )
+    .run(bookId, book.owner_id, member ? member.id : null, borrowerName, notes, dueAt);
+
+  if (member) {
+    notify(member.id, {
+      type: 'loan_lent',
+      title: 'Book on loan to you',
+      body: `${req.user.display_name} lent you "${book.title}", due back ${formatDate(dueAt)}.`,
+      link: '#/borrowing'
+    });
+  }
 
   res.status(201).json({ loan: shapeLoan(loadLoan(info.lastInsertRowid)) });
 });
@@ -185,12 +232,14 @@ router.post('/:id/request-return', (req, res) => {
   db.prepare("UPDATE loans SET status = 'return_requested', return_requested_at = datetime('now') WHERE id = ?").run(
     loan.id
   );
-  notify(loan.borrower_id, {
-    type: 'return_requested',
-    title: 'Please return this book',
-    body: `${loan.owner_name} has asked for "${loan.book_title}" back.`,
-    link: '#/borrowing'
-  });
+  if (loan.borrower_id) {
+    notify(loan.borrower_id, {
+      type: 'return_requested',
+      title: 'Please return this book',
+      body: `${loan.owner_name} has asked for "${loan.book_title}" back.`,
+      link: '#/borrowing'
+    });
+  }
   res.json({ loan: shapeLoan(loadLoan(loan.id)) });
 });
 
@@ -205,12 +254,14 @@ router.post('/:id/extend', (req, res) => {
   const dueAt = base.toISOString().slice(0, 10);
 
   db.prepare("UPDATE loans SET due_at = ?, last_reminder_at = NULL, status = 'lent' WHERE id = ?").run(dueAt, loan.id);
-  notify(loan.borrower_id, {
-    type: 'loan_extended',
-    title: 'Loan extended',
-    body: `"${loan.book_title}" is now due back on ${formatDate(dueAt)}.`,
-    link: '#/borrowing'
-  });
+  if (loan.borrower_id) {
+    notify(loan.borrower_id, {
+      type: 'loan_extended',
+      title: 'Loan extended',
+      body: `"${loan.book_title}" is now due back on ${formatDate(dueAt)}.`,
+      link: '#/borrowing'
+    });
+  }
   res.json({ loan: shapeLoan(loadLoan(loan.id)) });
 });
 
@@ -220,12 +271,14 @@ router.post('/:id/return', (req, res) => {
   if (!loan) return;
 
   db.prepare("UPDATE loans SET status = 'returned', returned_at = datetime('now') WHERE id = ?").run(loan.id);
-  notify(loan.borrower_id, {
-    type: 'loan_returned',
-    title: 'Return confirmed',
-    body: `${loan.owner_name} confirmed the return of "${loan.book_title}". Thank you!`,
-    link: '#/borrowing'
-  });
+  if (loan.borrower_id) {
+    notify(loan.borrower_id, {
+      type: 'loan_returned',
+      title: 'Return confirmed',
+      body: `${loan.owner_name} confirmed the return of "${loan.book_title}". Thank you!`,
+      link: '#/borrowing'
+    });
+  }
   res.json({ loan: shapeLoan(loadLoan(loan.id)) });
 });
 

@@ -19,11 +19,11 @@ export function runReminderSweep() {
     .prepare(
       `SELECT l.*, b.title AS book_title,
               ob.display_name AS owner_name, ob.reminder_days AS owner_reminder_days,
-              br.display_name AS borrower_name
+              COALESCE(br.display_name, l.manual_borrower_name) AS borrower_name
        FROM loans l
        JOIN books b ON b.id = l.book_id
        JOIN users ob ON ob.id = l.owner_id
-       JOIN users br ON br.id = l.borrower_id
+       LEFT JOIN users br ON br.id = l.borrower_id
        WHERE l.status IN ('lent','return_requested') AND l.due_at IS NOT NULL`
     )
     .all();
@@ -43,12 +43,14 @@ export function runReminderSweep() {
 
     if (remaining < 0) {
       const overdueBy = Math.abs(remaining);
-      notify(loan.borrower_id, {
-        type: 'loan_overdue',
-        title: 'Book overdue',
-        body: `"${loan.book_title}" was due back to ${loan.owner_name} ${overdueBy} day${overdueBy === 1 ? '' : 's'} ago.`,
-        link: '#/borrowing'
-      });
+      if (loan.borrower_id) {
+        notify(loan.borrower_id, {
+          type: 'loan_overdue',
+          title: 'Book overdue',
+          body: `"${loan.book_title}" was due back to ${loan.owner_name} ${overdueBy} day${overdueBy === 1 ? '' : 's'} ago.`,
+          link: '#/borrowing'
+        });
+      }
       notify(loan.owner_id, {
         type: 'loan_overdue_owner',
         title: 'Loan overdue',
@@ -58,23 +60,27 @@ export function runReminderSweep() {
       stamp.run(loan.id);
       sent++;
     } else if (remaining === 0) {
-      notify(loan.borrower_id, {
-        type: 'loan_due',
-        title: 'Book due back today',
-        body: `"${loan.book_title}" is due back to ${loan.owner_name} today.`,
-        link: '#/borrowing'
-      });
-      stamp.run(loan.id);
-      sent++;
+      if (loan.borrower_id) {
+        notify(loan.borrower_id, {
+          type: 'loan_due',
+          title: 'Book due back today',
+          body: `"${loan.book_title}" is due back to ${loan.owner_name} today.`,
+          link: '#/borrowing'
+        });
+        stamp.run(loan.id);
+        sent++;
+      }
     } else if (lead > 0 && remaining <= lead) {
-      notify(loan.borrower_id, {
-        type: 'loan_due_soon',
-        title: 'Book due soon',
-        body: `"${loan.book_title}" is due back to ${loan.owner_name} on ${formatDate(loan.due_at)}.`,
-        link: '#/borrowing'
-      });
-      stamp.run(loan.id);
-      sent++;
+      if (loan.borrower_id) {
+        notify(loan.borrower_id, {
+          type: 'loan_due_soon',
+          title: 'Book due soon',
+          body: `"${loan.book_title}" is due back to ${loan.owner_name} on ${formatDate(loan.due_at)}.`,
+          link: '#/borrowing'
+        });
+        stamp.run(loan.id);
+        sent++;
+      }
     }
   }
 

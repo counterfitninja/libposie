@@ -11,7 +11,7 @@ const selectCategories = db.prepare(
 
 const selectActiveLoan = db.prepare(
   `SELECT l.*, u.username AS borrower_username, u.display_name AS borrower_name
-   FROM loans l JOIN users u ON u.id = l.borrower_id
+   FROM loans l LEFT JOIN users u ON u.id = l.borrower_id
    WHERE l.book_id = ? AND l.status IN (${activePlaceholders})
    ORDER BY l.id DESC LIMIT 1`
 );
@@ -47,7 +47,13 @@ export function shapeLoan(loan) {
     returnedAt: loan.returned_at,
     bookTitle: loan.book_title,
     coverUrl: loan.cover_url,
-    borrower: loan.borrower_name ? { id: loan.borrower_id, name: loan.borrower_name, username: loan.borrower_username } : null,
+    isManual: !loan.borrower_id,
+    borrower: loan.borrower_id
+      ? { id: loan.borrower_id, name: loan.borrower_name, username: loan.borrower_username }
+      : loan.manual_borrower_name
+        ? { name: loan.manual_borrower_name, manual: true }
+        : null,
+    manualNotes: loan.manual_borrower_notes || null,
     owner: loan.owner_name ? { id: loan.owner_id, name: loan.owner_name, username: loan.owner_username } : null,
     overdue: !!(loan.due_at && !loan.returned_at && new Date(loan.due_at) < new Date())
   };

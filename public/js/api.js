@@ -57,6 +57,7 @@ export const api = {
   borrowing: () => request('GET', '/loans/borrowing'),
   lending: () => request('GET', '/loans/lending'),
   requestLoan: (payload) => request('POST', '/loans', payload),
+  manualLoan: (payload) => request('POST', '/loans/manual', payload),
   loanAction: (id, action, payload) => request('POST', `/loans/${id}/${action}`, payload || {}),
 
   notifications: () => request('GET', '/notifications'),
@@ -67,6 +68,7 @@ export const api = {
   unsubscribePush: (endpoint) => request('POST', '/notifications/push/unsubscribe', { endpoint }),
 
   users: () => request('GET', '/users'),
+  userDirectory: () => request('GET', '/users/directory'),
   adminOverview: () => request('GET', '/users/admin/overview'),
   adminUpdateUser: (id, payload) => request('PUT', `/users/admin/${id}`, payload),
   adminDeleteUser: (id) => request('DELETE', `/users/admin/${id}`),
