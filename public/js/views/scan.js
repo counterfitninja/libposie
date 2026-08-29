@@ -7,6 +7,8 @@ export async function renderScan({ mount }) {
   await refreshCategories();
   let stopScanner = null;
   let lastCode = '';
+  let pending = [];
+  let pendingSeq = 0;
 
   mount.innerHTML = `
     <div class="page-head">
@@ -36,9 +38,17 @@ export async function renderScan({ mount }) {
       <button class="btn ghost" type="button" id="manual">Enter manually</button>
     </form>
 
-    <div id="results"></div>`;
+    <div id="results"></div>
+
+    <div id="pendingSection" class="hidden" style="margin-top:1.2rem">
+      <h2>Scanned books ready to confirm</h2>
+      <p class="small muted">Keep scanning — confirm each one whenever you're ready.</p>
+      <div class="stack" id="pendingList"></div>
+    </div>`;
 
   const results = mount.querySelector('#results');
+  const pendingSection = mount.querySelector('#pendingSection');
+  const pendingList = mount.querySelector('#pendingList');
   const camWrap = mount.querySelector('#camWrap');
   const startBtn = mount.querySelector('#startCam');
   const stopBtn = mount.querySelector('#stopCam');
@@ -62,7 +72,7 @@ export async function renderScan({ mount }) {
         lastCode = code;
         navigator.vibrate?.(60);
         mount.querySelector('#q').value = code;
-        search(code);
+        queueFromScan(code);
       },
       (message) => {
         mount.querySelector('#camNote').textContent = message;
@@ -87,6 +97,83 @@ export async function renderScan({ mount }) {
   });
 
   mount.querySelector('#manual').addEventListener('click', () => openEditor({ title: '' }));
+
+  function renderPending() {
+    if (!pending.length) {
+      pendingSection.classList.add('hidden');
+      pendingList.innerHTML = '';
+      return;
+    }
+    pendingSection.classList.remove('hidden');
+    pendingList.innerHTML = pending.map((p) => `
+      <div class="result-item">
+        ${coverMarkup(p.candidate, 'thumb')}
+        <div>
+          <strong>${esc(p.candidate.title)}</strong>
+          <div class="small">${esc(p.candidate.authors || 'Unknown author')}</div>
+          <div class="small muted">${[p.candidate.publisher, p.candidate.publishedDate, p.candidate.isbn13 || p.candidate.isbn10]
+            .filter(Boolean).map(esc).join(' · ')}</div>
+        </div>
+        <div class="row tight">
+          <button class="btn primary sm" data-confirm="${p.id}">Confirm</button>
+          <button class="btn ghost sm" data-discard="${p.id}">Discard</button>
+        </div>
+      </div>`).join('');
+    pendingList.querySelectorAll('[data-confirm]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.confirm);
+        const item = pending.find((p) => p.id === id);
+        if (item) openEditor(item.candidate, id);
+      });
+    });
+    pendingList.querySelectorAll('[data-discard]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.discard);
+        pending = pending.filter((p) => p.id !== id);
+        renderPending();
+      });
+    });
+  }
+
+  async function queueFromScan(query) {
+    if (!query) return;
+    results.innerHTML = spinner();
+    try {
+      const data = await api.lookup(query);
+      if (data.duplicate) {
+        results.innerHTML = '';
+        toast(`Already in your library: "${data.duplicate.title}"`, 'error');
+        return;
+      }
+      if (!data.results.length) {
+        results.innerHTML = emptyState(
+          '&#128269;',
+          'No matches found',
+          'Nothing came back for that barcode. You can enter it manually below.',
+          '<button class="btn primary" id="manual2" style="margin-top:.6rem">Enter details manually</button>'
+        );
+        results.querySelector('#manual2').addEventListener('click', () =>
+          openEditor({ title: '', isbn13: data.isIsbn ? query : '' })
+        );
+        return;
+      }
+      const candidate = data.results[0];
+      const dupe = pending.some((p) =>
+        (candidate.isbn13 && p.candidate.isbn13 === candidate.isbn13) ||
+        (candidate.isbn10 && p.candidate.isbn10 === candidate.isbn10));
+      results.innerHTML = '';
+      if (dupe) {
+        toast(`"${candidate.title}" is already in your scan queue`, 'error');
+        return;
+      }
+      pending.push({ id: pendingSeq++, candidate });
+      renderPending();
+      toast(`"${candidate.title}" queued — keep scanning`, 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+      results.innerHTML = emptyState('&#9888;', 'Search failed', err.message);
+    }
+  }
 
   async function search(query) {
     if (!query) return;
@@ -138,7 +225,7 @@ export async function renderScan({ mount }) {
     }
   }
 
-  function openEditor(candidate) {
+  function openEditor(candidate, pendingId) {
     const field = (id, label, value, type = 'text') =>
       `<div class="field"><label for="${id}">${label}</label>
         <input id="${id}" type="${type}" value="${esc(value ?? '')}" /></div>`;
@@ -175,7 +262,7 @@ export async function renderScan({ mount }) {
         </div>
         <label class="switch"><input type="checkbox" id="n_notePublic" /><span>Make this note public</span></label>
 
-        <label class="switch" style="margin-top:.9rem"><input type="checkbox" id="n_isPublic" /><span>Show in the public catalogue</span></label>
+        <label class="switch" style="margin-top:.9rem"><input type="checkbox" id="n_isPublic" checked /><span>Show in the public catalogue</span></label>
         <p class="hint">Other members will be able to see it and ask to borrow it.</p>
         <label class="switch" style="margin-top:.5rem"><input type="checkbox" id="n_lendable" checked /><span>Available to lend</span></label>`,
       footer: `<button class="btn ghost" data-close>Cancel</button>
@@ -219,9 +306,14 @@ export async function renderScan({ mount }) {
             }
             close();
             toast(`"${book.title}" added to your library`, 'success');
-            lastCode = '';
-            results.innerHTML = '';
-            mount.querySelector('#q').value = '';
+            if (pendingId !== undefined) {
+              pending = pending.filter((p) => p.id !== pendingId);
+              renderPending();
+            } else {
+              lastCode = '';
+              results.innerHTML = '';
+              mount.querySelector('#q').value = '';
+            }
             if (!stopScanner) mount.querySelector('#q').focus();
           } catch (err) {
             toast(err.message, 'error');

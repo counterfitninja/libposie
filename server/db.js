@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS books (
   shelf          TEXT,
   condition      TEXT,
   rating         INTEGER,
-  is_public      INTEGER NOT NULL DEFAULT 0,
+  is_public      INTEGER NOT NULL DEFAULT 1,
   lendable       INTEGER NOT NULL DEFAULT 1,
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
@@ -122,6 +122,13 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 `);
+
+// One-time migration: books used to default to private; flip existing ones to public so
+// the public-by-default behaviour applies retroactively, without overriding later user choices.
+if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migrated_books_public_default'").get()) {
+  db.exec("UPDATE books SET is_public = 1 WHERE is_public = 0");
+  db.prepare("INSERT INTO settings (key, value) VALUES ('migrated_books_public_default', '1')").run();
+}
 
 /** Active loan statuses: the book is not on the owner's shelf. */
 export const ACTIVE_LOAN_STATUSES = ['approved', 'lent', 'return_requested'];
