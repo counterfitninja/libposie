@@ -144,7 +144,7 @@ export async function renderBook({ param, mount }) {
     }
 
     openModal({
-      title: `Loan "${book.title}" without a request`,
+      title: `Loan "${book.title}"Loan`,
       body: `<div class="field">
           <label for="mlName">Borrower's name</label>
           <input id="mlName" list="mlMembers" placeholder="Type a name, or pick a member" autocomplete="off" />
