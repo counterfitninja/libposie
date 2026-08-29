@@ -94,7 +94,10 @@ const discover = await bob('GET', '/books/public');
 ok(`bob discovers ${discover.books.length} public book(s)`);
 
 const admin = await alice('GET', '/users/admin/overview');
-ok(`admin overview: ${admin.stats.users} users, ${admin.stats.books} books`);
+if (!Number.isInteger(admin.stats.categories) || !Number.isInteger(admin.stats.overdueLoans)) {
+  throw new Error('admin overview missing dedicated stats fields for the stats page');
+}
+ok(`admin overview: ${admin.stats.users} users, ${admin.stats.books} books, ${admin.stats.categories} categories`);
 
 const sweep = await alice('POST', '/admin/run-reminders');
 ok(`reminder sweep ran (${sweep.sent} sent)`);

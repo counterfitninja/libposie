@@ -69,6 +69,7 @@ export const api = {
 
   users: () => request('GET', '/users'),
   userDirectory: () => request('GET', '/users/directory'),
+  userStats: () => request('GET', '/users/stats'),
   adminOverview: () => request('GET', '/users/admin/overview'),
   adminUpdateUser: (id, payload) => request('PUT', `/users/admin/${id}`, payload),
   adminDeleteUser: (id) => request('DELETE', `/users/admin/${id}`),

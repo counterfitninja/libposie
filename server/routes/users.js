@@ -47,11 +47,45 @@ router.get('/admin/overview', requireAdmin, (_req, res) => {
     users: users.length,
     books: db.prepare('SELECT COUNT(*) AS n FROM books').get().n,
     publicBooks: db.prepare('SELECT COUNT(*) AS n FROM books WHERE is_public = 1').get().n,
+    categories: db.prepare('SELECT COUNT(*) AS n FROM categories').get().n,
     activeLoans: db
       .prepare("SELECT COUNT(*) AS n FROM loans WHERE status IN ('approved','lent','return_requested')")
+      .get().n,
+    overdueLoans: db
+      .prepare("SELECT COUNT(*) AS n FROM loans WHERE status IN ('lent','return_requested') AND due_at IS NOT NULL AND due_at < date('now')")
       .get().n
   };
   res.json({ stats, users });
+});
+
+router.get('/stats', requireAuth, (req, res) => {
+  const stats = {
+    books: db.prepare('SELECT COUNT(*) AS n FROM books WHERE owner_id = ?').get(req.user.id).n,
+    publicBooks: db.prepare('SELECT COUNT(*) AS n FROM books WHERE owner_id = ? AND is_public = 1').get(req.user.id).n,
+    categories: db.prepare('SELECT COUNT(*) AS n FROM categories WHERE user_id = ?').get(req.user.id).n,
+    availableBooks: db
+      .prepare(
+        `SELECT COUNT(*) AS n
+         FROM books b
+         LEFT JOIN loans l ON l.book_id = b.id AND l.status IN ('approved','lent','return_requested')
+         WHERE b.owner_id = ? AND (l.id IS NULL OR l.status NOT IN ('approved','lent','return_requested'))`
+      )
+      .get(req.user.id).n,
+    activeLoans: db
+      .prepare("SELECT COUNT(*) AS n FROM loans WHERE owner_id = ? AND status IN ('approved','lent','return_requested')")
+      .get(req.user.id).n,
+    pendingRequests: db
+      .prepare("SELECT COUNT(*) AS n FROM loans WHERE owner_id = ? AND status = 'requested'")
+      .get(req.user.id).n,
+    overdueLoans: db
+      .prepare("SELECT COUNT(*) AS n FROM loans WHERE owner_id = ? AND status IN ('lent','return_requested') AND due_at IS NOT NULL AND due_at < date('now')")
+      .get(req.user.id).n,
+    borrowingCount: db
+      .prepare("SELECT COUNT(*) AS n FROM loans WHERE borrower_id = ? AND status IN ('requested','approved','lent','return_requested')")
+      .get(req.user.id).n
+  };
+
+  res.json({ stats });
 });
 
 router.put('/admin/:id', requireAdmin, (req, res) => {

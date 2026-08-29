@@ -447,7 +447,7 @@ function lendingPanel(book) {
           </div>
         </div>`
       : `<p class="small muted">This book is on your shelf.</p>
-         <button class="btn" id="manualLoan">Loan without a request</button>`}
+         <button class="btn" id="manualLoan"></button>`}
 
     ${pending.length
       ? `<h3 style="margin-top:1rem">Pending requests</h3>

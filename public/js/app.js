@@ -9,6 +9,7 @@ import { renderBorrowing, renderLending } from './views/loans.js';
 import { renderCategories } from './views/categories.js';
 import { renderNotifications } from './views/notifications.js';
 import { renderSettings } from './views/settings.js';
+import { renderStats } from './views/stats.js';
 import { renderAdmin } from './views/admin.js';
 
 export const state = {
@@ -26,6 +27,7 @@ const routes = {
   lending: renderLending,
   categories: renderCategories,
   notifications: renderNotifications,
+  stats: renderStats,
   settings: renderSettings,
   admin: renderAdmin
 };
