@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { state } from '../app.js';
 import { coverMarkup, esc, spinner, emptyState, toast } from '../ui.js';
 
 export async function renderDiscover({ mount }) {
@@ -35,7 +36,14 @@ export async function renderDiscover({ mount }) {
 
   results.addEventListener('click', (e) => {
     const card = e.target.closest('[data-book]');
-    if (card) location.hash = `#/book/${card.dataset.book}`;
+    if (!card) return;
+    state.discoverScroll = {
+      viewX: mount.scrollLeft,
+      viewY: mount.scrollTop,
+      windowX: window.scrollX,
+      windowY: window.scrollY
+    };
+    location.hash = `#/book/${card.dataset.book}`;
   });
 
   async function load() {

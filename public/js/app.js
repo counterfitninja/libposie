@@ -16,7 +16,8 @@ export const state = {
   user: null,
   categories: [],
   unread: 0,
-  libraryScroll: null
+  libraryScroll: null,
+  discoverScroll: null
 };
 
 const routes = {
@@ -76,12 +77,13 @@ async function router() {
   }
   viewEl().scrollTo?.(0, 0);
   window.scrollTo(0, 0);
-  if (name === 'library' && state.libraryScroll) {
-    const scroll = state.libraryScroll;
-    state.libraryScroll = null;
+  const savedScroll = name === 'library' ? state.libraryScroll : name === 'discover' ? state.discoverScroll : null;
+  if (savedScroll) {
+    if (name === 'library') state.libraryScroll = null;
+    if (name === 'discover') state.discoverScroll = null;
     requestAnimationFrame(() => {
-      viewEl().scrollTo?.(scroll.viewX, scroll.viewY);
-      window.scrollTo(scroll.windowX, scroll.windowY);
+      viewEl().scrollTo?.(savedScroll.viewX, savedScroll.viewY);
+      window.scrollTo(savedScroll.windowX, savedScroll.windowY);
     });
   }
 }
