@@ -2,7 +2,7 @@ import { api } from '../api.js';
 import { state, refreshCategories } from '../app.js';
 import { coverMarkup, esc, emptyState, spinner, toast } from '../ui.js';
 
-const filters = { q: '', category: '', availability: '', visibility: '', sort: 'recent' };
+const filters = { q: '', category: '', availability: '', visibility: '', sort: 'title' };
 
 export async function renderLibrary({ mount }) {
   await refreshCategories();
