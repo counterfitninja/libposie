@@ -2,7 +2,13 @@ import { api } from '../api.js';
 import { state, refreshCategories } from '../app.js';
 import { coverMarkup, esc, emptyState, spinner, toast } from '../ui.js';
 
-const filters = { q: '', category: '', availability: '', visibility: '', sort: 'title' };
+const SORT_PREFERENCE_KEY = 'libposie.librarySort';
+const SORT_OPTIONS = ['recent', 'title', 'author'];
+const savedSort = localStorage.getItem(SORT_PREFERENCE_KEY);
+const filters = {
+  q: '', category: '', availability: '', visibility: '',
+  sort: SORT_OPTIONS.includes(savedSort) ? savedSort : 'title'
+};
 
 export async function renderLibrary({ mount }) {
   await refreshCategories();
@@ -65,6 +71,7 @@ export async function renderLibrary({ mount }) {
   });
   mount.querySelector('#sort').addEventListener('change', (e) => {
     filters.sort = e.target.value;
+    localStorage.setItem(SORT_PREFERENCE_KEY, filters.sort);
     load();
   });
 
