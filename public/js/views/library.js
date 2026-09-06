@@ -84,7 +84,12 @@ export async function renderLibrary({ mount }) {
         );
         return;
       }
-      results.innerHTML = `<div class="book-grid">${books.map(card).join('')}</div>`;
+
+      if (filters.sort === 'title' || filters.sort === 'author') {
+        renderShelfWithIndex(books);
+      } else {
+        results.innerHTML = `<div class="book-grid">${books.map(card).join('')}</div>`;
+      }
     } catch (err) {
       toast(err.message, 'error');
       results.innerHTML = emptyState('&#9888;', 'Could not load your library', err.message);
@@ -93,11 +98,86 @@ export async function renderLibrary({ mount }) {
 
   results.addEventListener('click', (e) => {
     const card = e.target.closest('[data-book]');
-    if (card) location.hash = `#/book/${card.dataset.book}`;
+    if (!card) return;
+    state.libraryScroll = {
+      viewX: mount.scrollLeft,
+      viewY: mount.scrollTop,
+      windowX: window.scrollX,
+      windowY: window.scrollY
+    };
+    location.hash = `#/book/${card.dataset.book}`;
   });
+
+  function renderShelfWithIndex(books) {
+    const sections = [];
+    let current = null;
+    for (const b of books) {
+      const letter = groupLetter(b);
+      if (!current || current.letter !== letter) {
+        current = { letter, books: [] };
+        sections.push(current);
+      }
+      current.books.push(b);
+    }
+    const present = new Set(sections.map((s) => s.letter));
+
+    const sectionsHtml = sections
+      .map(
+        (s) => `<div class="letter-header" id="${sectionId(s.letter)}" data-letter="${s.letter}">${s.letter}</div>
+      <div class="book-grid">${s.books.map(card).join('')}</div>`
+      )
+      .join('');
+
+    const azHtml = ALPHABET.map(
+      (l) => `<button type="button" data-letter="${l}" ${present.has(l) ? '' : 'disabled'}>${l}</button>`
+    ).join('');
+
+    results.innerHTML = `<div class="shelf-layout">
+      <div class="shelf-main">${sectionsHtml}</div>
+      <nav class="az-index" aria-label="Jump to letter">${azHtml}</nav>
+    </div>`;
+
+    const az = results.querySelector('.az-index');
+    az.querySelectorAll('button[data-letter]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        results.querySelector(`#${sectionId(btn.dataset.letter)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    setupScrollSpy(results, az);
+  }
 
   drawChips();
   await load();
+}
+
+function groupLetter(book) {
+  const src = (filters.sort === 'author' ? book.authors : book.title) || '';
+  const ch = src.trim().charAt(0).toUpperCase();
+  return ch >= 'A' && ch <= 'Z' ? ch : '#';
+}
+
+function sectionId(letter) {
+  return `shelf-${letter === '#' ? 'hash' : letter}`;
+}
+
+const ALPHABET = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
+
+function setupScrollSpy(container, az) {
+  const headers = [...container.querySelectorAll('.letter-header')];
+  if (!headers.length) return;
+  const buttons = new Map([...az.querySelectorAll('button[data-letter]')].map((b) => [b.dataset.letter, b]));
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        buttons.forEach((b) => b.classList.remove('active'));
+        buttons.get(entry.target.dataset.letter)?.classList.add('active');
+      });
+    },
+    { rootMargin: '-10% 0px -80% 0px', threshold: 0 }
+  );
+  headers.forEach((h) => observer.observe(h));
 }
 
 function card(book) {

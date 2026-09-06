@@ -15,7 +15,8 @@ import { renderAdmin } from './views/admin.js';
 export const state = {
   user: null,
   categories: [],
-  unread: 0
+  unread: 0,
+  libraryScroll: null
 };
 
 const routes = {
@@ -75,6 +76,14 @@ async function router() {
   }
   viewEl().scrollTo?.(0, 0);
   window.scrollTo(0, 0);
+  if (name === 'library' && state.libraryScroll) {
+    const scroll = state.libraryScroll;
+    state.libraryScroll = null;
+    requestAnimationFrame(() => {
+      viewEl().scrollTo?.(scroll.viewX, scroll.viewY);
+      window.scrollTo(scroll.windowX, scroll.windowY);
+    });
+  }
 }
 
 /* ------------------------------------------------------------ shell wiring */
